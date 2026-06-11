@@ -201,6 +201,31 @@ for tgt, axes in T6.items():
         chk(f"T6 {axis}@{tgt} mond gap", mond_gap, float(sd["coverage_gap"].mean()))
 
 # =========================================================================== #
+# TABLE 7 -- set-size disparity (the "tax"), @90% LAC pooled
+# =========================================================================== #
+print("### Table 7: RQ3 set-size disparity @90% (LAC, pooled)")
+T7 = {
+    ("sex", "marginal"): 0.058, ("sex", "mondrian"): 0.086,
+    ("age", "marginal"): 0.236, ("age", "mondrian"): 0.369,
+    ("race", "marginal"): 0.123, ("race", "mondrian"): 0.154,
+    ("predclass", "marginal"): 0.115, ("predclass", "mondrian"): 0.157,
+}
+for (axis, method), val in T7.items():
+    sub = lac(method=method, axis=axis, target=0.90)
+    chk(f"T7 {axis}/{method} set-size disparity", val,
+        float(sub["set_size_disparity"].mean()), tol=2e-3)
+
+# =========================================================================== #
+# THEORY (Sec 3.6) -- noise-floor arithmetic stated in the paper
+# =========================================================================== #
+print("### Theory: Mondrian noise floor sqrt(a(1-a)/n_min)*sqrt(2 ln G)")
+def floor(nmin, G, a=0.10):
+    return float(np.sqrt(a * (1 - a) / nmin) * np.sqrt(2 * np.log(G)))
+chk("Theory age floor ~0.046", 0.046, floor(140, 5), tol=2e-3)
+chk("Theory race floor ~0.054", 0.054, floor(84, 4), tol=2e-3)
+chk("Theory sex floor ~0.012", 0.012, floor(888, 2), tol=2e-3)
+
+# =========================================================================== #
 # PROSE -- RQ1
 # =========================================================================== #
 print("### Prose: RQ1")
@@ -232,6 +257,16 @@ ranks = ece[MODELS].rank(axis=1).mean()
 for m, r in {"tabpfn_temp": 1.8, "mlp": 2.0, "tabpfn": 2.2,
              "lightgbm": 4.0, "xgboost": 5.0}.items():
     chk(f"RQ1 rank {m}", r, float(ranks[m]), tol=0.15)
+# per-dataset TabPFN accuracy (RQ1 consistency paragraph)
+for ds, a in {"ACSEmployment-CA": 0.812, "ACSIncome-CA": 0.814,
+              "ACSPublicCoverage-CA": 0.720}.items():
+    chk(f"RQ1 tabpfn acc {ds}", a,
+        float(CAL[(CAL.model == "tabpfn") & (CAL.dataset == ds)]["accuracy"].mean()))
+# MLP is least accurate on 2 of 3 tasks
+mlp_lowest = sum(
+    CAL[CAL.dataset == ds].groupby("model")["accuracy"].mean().idxmin() == "mlp"
+    for ds in CAL.dataset.unique())
+chk("RQ1 MLP least-accurate on 2 tasks", 2, mlp_lowest, tol=0.5)
 
 # =========================================================================== #
 # PROSE -- RQ2
@@ -265,6 +300,10 @@ chk("RQ3 age@80 marg WGC 0.732", 0.732,
     float(lac(method="marginal", axis="age", target=0.80)["worst_group_coverage"].mean()))
 chk("RQ3 age@80 mond WGC 0.774", 0.774,
     float(lac(method="mondrian", axis="age", target=0.80)["worst_group_coverage"].mean()))
+chk("RQ3 age@95 marg WGC 0.927", 0.927,
+    float(lac(method="marginal", axis="age", target=0.95)["worst_group_coverage"].mean()))
+chk("RQ3 age@95 mond WGC 0.935", 0.935,
+    float(lac(method="mondrian", axis="age", target=0.95)["worst_group_coverage"].mean()))
 # race per-dataset marginal -> mondrian gap at 90%
 race_pd = {"ACSEmployment-CA": (0.034, 0.049), "ACSIncome-CA": (0.047, 0.060),
            "ACSPublicCoverage-CA": (0.056, 0.061)}

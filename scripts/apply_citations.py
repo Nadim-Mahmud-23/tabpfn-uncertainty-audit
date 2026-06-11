@@ -72,7 +72,11 @@ def main():
                 unmatched.append(s)
             elif k not in keys:
                 keys.append(k)
-        return "\\cite{" + ",".join(keys) + "}" if keys else body
+        if not keys:
+            return body
+        # preserve a trailing space so "\cite{x} word" doesn't glue together
+        trail = " " if body[-1].isspace() else ""
+        return "\\cite{" + ",".join(keys) + "}" + trail
 
     new_head = re.sub(r"(\[CIT:[^\]]*\]\s*)+", repl_run, head)
 
