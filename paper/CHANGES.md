@@ -80,7 +80,88 @@ are listed here.
 
 ---
 
-## PHASE 2 — number verification — *pending*
-## PHASE 3 — figure regeneration (LAC-only, dpi=300) — *pending*
-## PHASE 4 — IJAR reframe — *pending*
-## PHASE 5 — security, build, word count — *pending*
+## Author / repo / licensing (resolved from user instruction)
+
+- Author: **Nadim Mahmud Dipu**, Brac University, Dhaka, Bangladesh. Single-author CRediT
+  (all roles); competing interest: none declared. Data-availability statement added (ACS PUMS
+  2018 1-Year via folktables).
+- Repository: **https://github.com/Nadim-Mahmud-23/tabpfn-uncertainty-audit** (public),
+  **MIT license** (`LICENSE`, © 2026 Nadim Mahmud Dipu).
+- Compute time: ~1 hour wall-clock (≈55 min for the 75-cell matrix, TabPFN CPU inference
+  dominant) on an Apple Silicon MacBook (observed during the run).
+
+## PHASE 2 — number verification — DONE
+
+- `scripts/verify_paper_numbers.py` recomputes Tables 1–6 + all Results prose from the raw
+  CSVs (LAC-only for conformal/fairness). **180/180 checks PASS, 0 FAIL.** No tex number
+  needed correction — the draft's values were already exact. Script is committed (reviewer
+  artifact). Group-size Table 3 also verified against `results/group_sizes.csv`.
+
+## PHASE 3 — figures (LAC-only, dpi=300 + vector PDF) — DONE
+
+- `scripts/make_figures.py` regenerates `coverage_gap_{age,sex,race}` and
+  `reliability_example` as **PNG (dpi=300) + PDF**, with the `score=='lac'` filter (the old
+  PNGs averaged in degenerate APS rows and were half-height). Verified age bars now read
+  ≈0.08 marginal / ≈0.05 Mondrian, matching Table 5/6.
+- Removed all three `[NOTE TO AUTHORS]` caption reminders. Fixed the reliability caption
+  ("equal-mass" → "15 equal-width confidence bins", per `src/calibration.py:52-55`). Added
+  "(LAC score)" to the sex/race captions. Figures now referenced via `\graphicspath{{../figures/}}`
+  with vector-PDF includes (paper.tex lives in `paper/`, figures in repo-root `figures/`).
+
+## PHASE 4 — IJAR reframe — DONE (references pending verification)
+
+- `\journal{}` → International Journal of Approximate Reasoning; header comment updated.
+- New title: *"Subgroup coverage in split conformal classification: marginal validity,
+  Mondrian repair, and small-group failure, with an audit of TabPFN."*
+  (variants considered, see below).
+- Abstract and Introduction rewritten to **lead with the conformal/subgroup-coverage
+  contribution**; TabPFN demoted to "model under audit" (RQ1/RQ2 retained as secondary).
+  Contribution bullets reordered (coverage-fairness first). Related Work reordered
+  (conformal + group-conditional first). Conclusion first paragraph reframed. Keywords
+  reordered (conformal first).
+- Finite-sample variance argument made **precise**: new Eq. (sd ≈ sqrt(alpha(1-alpha)/n_g))
+  in §3.5, with the gap scaling as 1/sqrt(min_g n_g); used consistently in abstract/intro/§5.3.
+- `paper/highlights.tex` created — 5 bullets, each ≤85 chars (verified 71–79).
+- elsarticle (review,12pt) + line numbers + elsarticle-num retained.
+
+### Title variants considered
+1. (chosen) "Subgroup coverage in split conformal classification: marginal validity,
+   Mondrian repair, and small-group failure, with an audit of TabPFN."
+2. "When does group-conditional conformal prediction help? Marginal validity, Mondrian
+   repair, and small-stratum failure, audited on a tabular foundation model."
+3. "Equitable coverage is procedural, not model-borne: split conformal validity and the
+   small-group limits of Mondrian calibration, with TabPFN under audit."
+
+## PHASE 5 — security / build / word count — PARTIAL
+
+- **Security (DONE):** removed hardcoded HF_TOKEN/TABPFN_TOKEN from all three notebooks →
+  dependency-free `.env` loader; added `.env.example`, `.env` in `.gitignore`. Repo-wide grep
+  confirms no token strings outside the gitignored `.env`; the pushed remote tree (45 files)
+  contains no `.env` and no `data/` cache. (User to revoke the leaked tokens.)
+- **Word count:** `wc -w paper.tex` = **7,566** (the loose measure the cover note's "7,400"
+  used — counts LaTeX markup, table cells, bibliography). True **main-text prose ≈ 2,600–2,800
+  words** excluding references/tables/equations; abstract 300. **This is under the 7,000–9,000
+  target by the honest measure** — flagged for the author; not padded. Expanding would mean
+  real new content (e.g., the Tier-B suite, a longer Related Work/Discussion).
+- **Build (DONE):** installed **Tectonic** (via Homebrew, no sudo; auto-fetches `elsarticle.cls`
+  and CTAN deps). `paper.pdf` compiles to **35 pages** (review/double-spaced 12pt). Log is clean:
+  **no undefined citations or references**, no overfull hbox > 15 pt. Remaining 14 small overfull /
+  11 underfull boxes are cosmetic URL line-breaks in the bibliography. Rebuild with
+  `tectonic -X compile paper.tex` (or `pdflatex; bibtex; pdflatex x2`).
+
+## References — DONE (verified BibTeX)
+
+- All 23 references web-verified (DBLP / official proceedings / arXiv / Nature / JASA / Royal
+  Holloway) into `paper/refs.bib`; `scripts/apply_citations.py` converted the 72 inline `[CIT:]`
+  stubs → 32 `\cite{}` commands and switched the manual bibliography to `\bibliography{refs}`
+  (`\bibliographystyle{elsarticle-num}`). 0 stubs remain; all 23 cited keys resolve.
+- **Five entries carry `% UNVERIFIED` sub-field flags** (author first names only, except one):
+  `nixon2019` (first names of Dusenberry/Zhang/Jerfel), `papadopoulos2002` (first names
+  Harris/Kostas), `jung2023` (first names Christopher/Georgy/Ramya), and `gibbs2023`
+  (cited as arXiv:2305.12616; reportedly accepted to JRSS-B 2025 but vol/pages/DOI unconfirmed).
+  Surnames, titles, venues, and years for all five are verified. Please glance at these before
+  submission.
+- IJAR guide (sub-agent, partly from Elsevier house style as the live page blocks automated
+  fetch): Highlights 3-5 bullets ≤85 chars (✓), elsarticle-num correct (✓), abstract ~250 words
+  (trimmed to **246**), single-column elsarticle for submission. Double-check the exact IJAR
+  abstract cap on the live Guide-for-Authors page.

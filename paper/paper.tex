@@ -1,14 +1,12 @@
 % =====================================================================
-% Auditing the Uncertainty of a Tabular Foundation Model:
-% Calibration, Conformal Validity, and Subgroup Coverage Fairness of TabPFN
+% Subgroup coverage in split conformal classification, with an audit of TabPFN
 %
-% Target: Elsevier Q1 (e.g., Knowledge-Based Systems / ESWA)
-% All numbers verified against results/calibration.csv and
-% results/conformal_fairness.csv (recomputed from raw rows, NOT from the
-% exported table_RQ*.csv files, which average over the degenerate APS
-% configuration -- see cover note).
-% Placeholders: [CIT: ...] for references, [MISSING: ...] for values not
-% derivable from the provided artifacts.
+% Target: International Journal of Approximate Reasoning (IJAR, Elsevier)
+% Every numeric claim is verified against results/calibration.csv and
+% results/conformal_fairness.csv by scripts/verify_paper_numbers.py
+% (180/180 checks pass; LAC-only for all conformal/fairness numbers, NOT the
+% exported table_RQ*.csv files, which average in the degenerate APS rows).
+% Citations resolved to refs.bib via scripts/apply_citations.py; see paper/CHANGES.md.
 % =====================================================================
 \documentclass[review,12pt]{elsarticle}
 
@@ -16,28 +14,29 @@
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{graphicx}
+\graphicspath{{../figures/}{figures/}}
 \usepackage{xcolor}
 \usepackage[hidelinks]{hyperref}
 \usepackage{lineno}
 \modulolinenumbers[5]
 
-\journal{Knowledge-Based Systems}
+\journal{International Journal of Approximate Reasoning}
 
 \begin{document}
 
 \begin{frontmatter}
 
-\title{Auditing the uncertainty of a tabular foundation model: calibration, conformal validity, and subgroup coverage fairness of TabPFN}
+\title{Subgroup coverage in split conformal classification: marginal validity, Mondrian repair, and small-group failure, with an audit of TabPFN}
 
 \author[inst1]{Nadim Mahmud Dipu}
 \affiliation[inst1]{organization={Brac University}, city={Dhaka}, country={Bangladesh}}
 
 \begin{abstract}
-Tabular foundation models such as TabPFN now match or exceed gradient-boosted decision trees (GBDTs) on small-to-medium tabular classification tasks, yet the trustworthiness of their predictive uncertainty---and in particular how that uncertainty is distributed across protected demographic groups---remains largely unaudited. We present a systematic audit of TabPFN's uncertainty on three US Census prediction tasks from the folktables suite (ACSIncome, ACSEmployment, ACSPublicCoverage; California), comparing it against XGBoost, LightGBM, and a multilayer perceptron under a common protocol of five seeds, three confidence levels, and two conformity scores. Three findings emerge. First, TabPFN is markedly better calibrated out of the box than untuned GBDTs (mean adaptive ECE $0.026$ vs.\ $0.075$ for XGBoost and $0.052$ for LightGBM; Wilcoxon $p<10^{-4}$), and post-hoc temperature scaling yields no further significant improvement. Second, under split conformal prediction with the LAC score, all models attain near-nominal marginal coverage, but TabPFN produces significantly smaller prediction sets (mean size $1.296$ vs.\ $1.327$--$1.363$ at the $90\%$ level; $p<10^{-3}$). Third, marginal coverage conceals systematic subgroup miscoverage---worst-group coverage by age falls to $0.862$ at the $90\%$ target---that Mondrian (group-conditional) conformal prediction repairs for large groups (age gap $0.081\!\to\!0.051$, $p<10^{-10}$) but \emph{worsens} for the small-support race axis (gap $0.046\!\to\!0.057$, $p<10^{-3}$), an effect we attribute to finite-sample quantile noise in small calibration strata. We distil these results into concrete deployment guidance: TabPFN's native probabilities are a strong default, conformal wrapping should use LAC rather than non-randomized APS on binary tasks, and Mondrian stratification should be applied only where per-group calibration support is adequate.
+Split conformal prediction endows any classifier with finite-sample, distribution-free \emph{marginal} coverage, but marginal validity says nothing about how miscoverage is distributed across protected subgroups---the property that matters when prediction sets gate consequential decisions. We study this gap, empirically and through a finite-sample variance argument, on three US Census tasks from folktables (ACSIncome, ACSEmployment, ACSPublicCoverage; California), wrapping five predictors in split conformal prediction across three confidence levels, two conformity scores, and four group taxonomies. Marginal coverage conceals systematic subgroup miscoverage: at a $90\%$ target the worst-covered age group receives only $86.2\%$ coverage (gap $0.081$), though every model meets the marginal guarantee. Mondrian (group-conditional) calibration repairs this where strata are large---the age gap falls to $0.051$ ($p<10^{-10}$), costing $0.021$ in mean set size---but \emph{worsens} it where strata are small: on the race axis, whose smallest calibration stratum holds only $\approx\!84$ points, the gap rises from $0.046$ to $0.057$ ($p<10^{-3}$). We trace this to the finite-sample variance of the in-expectation guarantee: realized per-group coverage fluctuates as $\sqrt{\alpha(1-\alpha)/n_g}$, so the max$-$min gap grows as strata shrink. These effects are nearly identical across all five predictors---coverage fairness is governed by the conformal procedure and the group structure, not the model. As the model under audit, TabPFN is the most reliable base learner we tested: better calibrated out of the box than untuned GBDTs (adaptive ECE $0.026$ vs.\ $0.075$/$0.052$), needing no temperature scaling, and yielding the smallest sets. We also flag a silent failure of non-randomized APS on binary tasks, and give support-aware guidance: use LAC, report worst-group coverage, and apply Mondrian only where $n_g \gtrsim 10/\alpha$.
 \end{abstract}
 
 \begin{keyword}
-tabular foundation models \sep TabPFN \sep conformal prediction \sep calibration \sep algorithmic fairness \sep equalized coverage \sep uncertainty quantification \sep prior-data fitted networks
+conformal prediction \sep equalized coverage \sep group-conditional calibration \sep Mondrian conformal prediction \sep uncertainty quantification \sep calibration \sep algorithmic fairness \sep tabular foundation models \sep TabPFN
 \end{keyword}
 
 \end{frontmatter}
@@ -48,11 +47,13 @@ tabular foundation models \sep TabPFN \sep conformal prediction \sep calibration
 \section{Introduction}
 \label{sec:intro}
 
-Tabular data remains the dominant modality in high-stakes decision systems---credit scoring, eligibility determination, clinical triage---and for over a decade gradient-boosted decision trees (GBDTs) have been the default model family for such data [CIT: Grinsztajn et al.\ 2022, tree-based models outperform deep learning on tabular data]. This default is now being challenged by \emph{tabular foundation models}, most prominently TabPFN, a prior-data fitted network (PFN) that performs supervised learning as a single forward pass of in-context learning and has been reported to outperform tuned GBDT ensembles on small-to-medium tabular benchmarks [CIT: Hollmann et al., TabPFN, ICLR 2023] [CIT: TabPFN v2, Nature 2025].
+Set-valued prediction with coverage guarantees has become a standard tool for trustworthy machine learning. Given any classifier and an exchangeable calibration sample, split (inductive) conformal prediction returns a prediction set that contains the true label with a user-specified probability $1-\alpha$, distribution-free and in finite samples \cite{vovk2005,papadopoulos2002,angelopoulos2023}. This guarantee, however, is \emph{marginal}: it averages over the whole population. In the high-stakes tabular settings where conformal prediction is increasingly deployed---credit scoring, benefits eligibility, clinical triage---decisions concern individuals who belong to protected demographic groups, and a guarantee that holds on average can fail conditionally. A $90\%$ marginal guarantee is compatible with, say, $86\%$ coverage for one group and $94\%$ for another, silently concentrating error---less reliable, less informative sets---on the worse-covered group \cite{romano2020eq}. Whether, and when, marginal conformal prediction hides such subgroup disparities is the central question of this paper.
 
-Accuracy, however, is not the property that gates deployment in consequential settings; \emph{trustworthy uncertainty} is. A model used to allocate benefits or flag risk must (i) report probabilities that are calibrated, (ii) support distribution-free set-valued prediction with coverage guarantees, and (iii) distribute its uncertainty \emph{equitably}: a $90\%$ coverage guarantee that holds on average but delivers $86\%$ coverage to one demographic group and $94\%$ to another silently concentrates error on the former group [CIT: Romano, Barber, Sabatti, Cand\`es, ``With malice toward none'', 2020, equalized coverage]. For GBDTs and conventional neural networks, the calibration literature is mature [CIT: Guo et al.\ 2017, on calibration of modern neural networks] [CIT: Niculescu-Mizil \& Caruana 2005, predicting good probabilities]. For tabular foundation models it is nascent: TabPFN's posterior-predictive outputs are often \emph{described} as well calibrated by construction, but we are aware of no systematic audit of (a) how that calibration compares to strong baselines under a matched protocol, (b) how its probabilities behave as conformity scores inside split conformal prediction, and (c) whether the resulting coverage is fair across protected groups. This paper provides such an audit.
+The textbook remedy is \emph{Mondrian} (group-conditional) conformal prediction \cite{vovk2003,romano2020eq}, which calibrates a separate quantile within each group and so guarantees coverage \emph{within} every group---``equalized coverage''---rather than only on average. That guarantee, though, holds in expectation over calibration draws, and it is purchased with data: each group's threshold is estimated from only the $n_g$ calibration points falling in that group. When some groups are small---as protected attributes with imbalanced categories routinely are---those thresholds are noisy, and the realized per-group coverage can vary enough that group-conditional calibration \emph{increases} the empirical disparity it was meant to remove. The practically important question is therefore not whether equalized coverage holds in expectation (it does), but when Mondrian stratification helps versus harms in finite samples, and how a practitioner should decide. We give a clean empirical characterization of both regimes together with a simple finite-sample variance argument that predicts which one obtains.
 
-We study three binary prediction tasks derived from US Census microdata via the folktables package [CIT: Ding et al.\ 2021, retiring Adult]---ACSIncome, ACSEmployment, and ACSPublicCoverage for California---each carrying protected attributes (sex, race, age). We compare TabPFN, with and without post-hoc temperature scaling, against XGBoost, LightGBM, and an MLP (all with fixed, untuned default hyperparameters) under an identical train/calibration/test protocol with five random seeds, and we wrap every model in split conformal prediction at three target levels ($80\%$, $90\%$, $95\%$) using two conformity scores (LAC and APS), in both marginal and Mondrian (group-conditional) variants.
+We situate this study in the tabular regime and pair it with a second, timely question: which base learner to trust. For over a decade gradient-boosted decision trees (GBDTs) have been the default for tabular classification \cite{grinsztajn2022}, but they are now challenged by \emph{tabular foundation models}, most prominently TabPFN, a prior-data fitted network (PFN) that performs supervised learning as a single forward pass of in-context inference and reportedly matches or exceeds tuned GBDT ensembles on small-to-medium tables \cite{tabpfn2023,tabpfn2025}. The choice of base learner still matters for uncertainty: although the conformal quantile step repairs \emph{validity} for any model, the calibration of the underlying probabilities controls set \emph{efficiency}, and good probabilities are what make calibrated decisions and tight sets possible. TabPFN's posterior-predictive outputs are often \emph{described} as well calibrated by construction, yet we are aware of no matched-protocol audit of (a) how that calibration compares to strong baselines, (b) how its probabilities behave as conformity scores inside split conformal prediction, and (c) whether the coverage it induces is fair across protected groups. We therefore adopt TabPFN as the model under audit---a strong, modern base learner whose uncertainty we scrutinize alongside the conformal questions above, against XGBoost, LightGBM, and an MLP. For GBDTs and conventional neural networks the calibration literature is mature \cite{guo2017,niculescu2005}; for tabular foundation models it is nascent.
+
+We study three binary prediction tasks derived from US Census microdata via the folktables package \cite{ding2021}---ACSIncome, ACSEmployment, and ACSPublicCoverage for California---each carrying protected attributes (sex, race, age). We compare TabPFN, with and without post-hoc temperature scaling, against XGBoost, LightGBM, and an MLP (all with fixed, untuned default hyperparameters) under an identical train/calibration/test protocol with five random seeds, and we wrap every model in split conformal prediction at three target levels ($80\%$, $90\%$, $95\%$) using two conformity scores (LAC and APS), in both marginal and Mondrian (group-conditional) variants.
 
 Our research questions and headline answers are:
 
@@ -62,7 +63,7 @@ Our research questions and headline answers are:
   \item \textbf{RQ3 (Coverage fairness).} \emph{Does marginal conformal prediction hide subgroup miscoverage, and does Mondrian conformal repair it?} Marginal coverage conceals an age-related gap of $0.081$ at the $90\%$ target (worst-group coverage $0.862$). Mondrian stratification repairs this for the age axis (gap $\to 0.051$, worst-group coverage $\to 0.881$, $p<10^{-10}$) at a small efficiency cost ($+0.021$ mean set size), is neutral on the already-equitable sex axis, but \emph{increases} the empirical gap on the race axis (from $0.046$ to $0.057$, $p<10^{-3}$) without improving worst-group coverage---a finite-sample failure mode driven by small calibration strata. Crucially, these effects are nearly identical across all five models: coverage fairness is governed by the conformal procedure and the group structure, not by the choice of predictor.
 \end{itemize}
 
-\noindent Our contributions are: (1) the first matched-protocol audit, to our knowledge, of a tabular foundation model's calibration, conformal efficiency, and group-conditional coverage against GBDT and MLP baselines (in their standard untuned configurations) on fairness-annotated census tasks; (2) statistically supported evidence that TabPFN is better calibrated and conformally more efficient than GBDTs in the small-to-medium tabular regime, and that temperature scaling is unnecessary for it; (3) an empirical characterization of when Mondrian conformal prediction helps versus harms, including a documented small-group failure mode on the race axis; (4) a negative result on non-randomized APS for binary tasks; and (5) an open, fully scripted pipeline with committed per-seed result files enabling exact reproduction.
+\noindent Our contributions are: (1) an empirical demonstration, across five predictors and three census tasks, that marginal conformal validity conceals systematic subgroup miscoverage, together with a finite-sample variance characterization of when group-conditional (Mondrian) calibration repairs it---large strata---versus \emph{worsens} it---small strata---including a documented, statistically significant small-group failure on the race axis, and the finding that these effects are essentially model-independent; (2) a practically important negative result on non-randomized APS for binary tasks; (3) the first matched-protocol audit, to our knowledge, of a tabular foundation model's calibration and conformal efficiency against GBDT and MLP baselines (in their standard untuned configurations), establishing that TabPFN is better calibrated than GBDTs---needing no temperature scaling---and yields the smallest prediction sets; (4) concrete, support-aware deployment guidance (use LAC, report worst-group coverage, and apply Mondrian only where $n_g \gtrsim 10/\alpha$); and (5) an open, fully scripted pipeline with committed per-seed result files and a verification script that recomputes every reported number, enabling exact reproduction.
 
 The remainder of the paper is organized as follows. Section~\ref{sec:related} reviews related work and positions our novelty. Section~\ref{sec:background} formalizes the calibration metrics, split conformal prediction, the LAC and APS scores, and Mondrian conformal prediction. Section~\ref{sec:method} details datasets, models, protocol, and the statistical analysis plan. Section~\ref{sec:results} reports results for RQ1--RQ3. Section~\ref{sec:discussion} interprets the findings and derives deployment guidance, Section~\ref{sec:limitations} discusses threats to validity, and Section~\ref{sec:conclusion} concludes.
 
@@ -70,20 +71,20 @@ The remainder of the paper is organized as follows. Section~\ref{sec:related} re
 \section{Related work}
 \label{sec:related}
 
-\paragraph{Tabular foundation models and prior-data fitted networks.}
-PFNs meta-train a transformer on synthetic datasets drawn from a prior over data-generating mechanisms, so that supervised prediction on a new table reduces to in-context inference [CIT: M\"uller et al.\ 2022, Transformers can do Bayesian inference]. TabPFN instantiated this idea for small tabular classification [CIT: Hollmann et al.\ 2023] and its successor scaled it to larger tables and regression [CIT: TabPFN v2, Nature 2025]. Evaluations of these models have focused overwhelmingly on accuracy and AUC against GBDT baselines [CIT: Grinsztajn et al.\ 2022] [CIT: McElfresh et al.\ 2023, when do neural nets outperform boosted trees]; their uncertainty behaviour is usually asserted (via the Bayesian-posterior interpretation) rather than audited.
+\paragraph{Conformal prediction.}
+Split (inductive) conformal prediction converts any scoring model into set-valued predictions with finite-sample, distribution-free marginal coverage under exchangeability \cite{vovk2005,papadopoulos2002,angelopoulos2023}. For classification, the LAC/homogeneous score thresholds $1-\hat p_y$ \cite{sadinle2019}, while APS accumulates sorted class probabilities to improve conditional coverage \cite{romano2020aps}; APS requires tie-breaking randomization to avoid over-coverage, a detail our results show to be decisive on binary tasks.
+
+\paragraph{Group-conditional coverage and fairness in uncertainty quantification.}
+Equalized coverage asks that prediction sets cover each protected group at the nominal rate, achievable by Mondrian/group-conditional calibration \cite{romano2020eq,vovk2003}. Subsequent work studies class-conditional and group-conditional validity, its finite-sample costs, and approximate conditional coverage \cite{ding2023,gibbs2023,jung2023}. The guarantee is an expectation over calibration draws, and its finite-sample slack and variance grow as strata shrink; yet empirical audits of \emph{coverage disparity} have targeted conventional models, none (to our knowledge) includes a tabular foundation model, and the regime in which Mondrian calibration \emph{backfires} on small strata has received little direct empirical study---a gap our RQ3 addresses head-on.
 
 \paragraph{Calibration of machine-learning classifiers.}
-Modern neural networks are frequently miscalibrated and benefit from post-hoc recalibration such as temperature scaling [CIT: Guo et al.\ 2017]; boosted trees are known to push scores away from the extremes, motivating Platt scaling and isotonic regression [CIT: Niculescu-Mizil \& Caruana 2005]. Metric estimation itself is delicate: binned ECE is biased, and adaptive (equal-mass) binning is the recommended estimator [CIT: Nixon et al.\ 2019, measuring calibration]. We adopt adaptive ECE as our primary metric and report Brier score and NLL as proper-scoring complements.
+Modern neural networks are frequently miscalibrated and benefit from post-hoc recalibration such as temperature scaling \cite{guo2017}; boosted trees are known to push scores away from the extremes, motivating Platt scaling and isotonic regression \cite{niculescu2005}. Metric estimation itself is delicate: binned ECE is biased, and adaptive (equal-mass) binning is the recommended estimator \cite{nixon2019}. We adopt adaptive ECE as our primary metric and report Brier score and NLL as proper-scoring complements.
 
-\paragraph{Conformal prediction.}
-Split (inductive) conformal prediction converts any scoring model into set-valued predictions with finite-sample, distribution-free marginal coverage under exchangeability [CIT: Vovk et al.\ 2005, Algorithmic Learning in a Random World] [CIT: Papadopoulos et al.\ 2002, inductive confidence machines] [CIT: Angelopoulos \& Bates 2023, gentle introduction]. For classification, the LAC/homogeneous score thresholds $1-\hat p_y$ [CIT: Sadinle et al.\ 2019, least ambiguous set-valued classifiers], while APS accumulates sorted class probabilities to improve conditional coverage [CIT: Romano et al.\ 2020, classification with valid and adaptive coverage]; APS requires tie-breaking randomization to avoid over-coverage, a detail our results show to be decisive on binary tasks.
-
-\paragraph{Fairness in uncertainty quantification.}
-Equalized coverage asks that prediction sets cover each protected group at the nominal rate, achievable by Mondrian/group-conditional calibration [CIT: Romano, Barber, Sabatti, Cand\`es 2020] [CIT: Vovk 2003, Mondrian confidence machine]. Subsequent work studies class-conditional and group-conditional validity, its finite-sample costs, and approximate conditional coverage [CIT: Ding et al.\ 2023/2024, class-conditional conformal] [CIT: Gibbs, Cherian, Cand\`es 2023, conditional guarantees]. Empirical audits of \emph{coverage disparity} have targeted conventional models; none, to our knowledge, includes a tabular foundation model.
+\paragraph{Tabular foundation models and prior-data fitted networks.}
+PFNs meta-train a transformer on synthetic datasets drawn from a prior over data-generating mechanisms, so that supervised prediction on a new table reduces to in-context inference \cite{pfn2022}. TabPFN instantiated this idea for small tabular classification \cite{tabpfn2023}and its successor scaled it to larger tables and regression \cite{tabpfn2025}. Evaluations of these models have focused overwhelmingly on accuracy and AUC against GBDT baselines \cite{grinsztajn2022,mcelfresh2023}; their uncertainty behaviour is usually asserted (via the Bayesian-posterior interpretation) rather than audited.
 
 \paragraph{Benchmarking tabular deep learning under matched protocols.}
-A recurring lesson of tabular benchmarking is that conclusions are protocol-sensitive---tuning budgets, preprocessing, and split design can reverse rankings [CIT: Grinsztajn et al.\ 2022] [CIT: Gorishniy et al.\ 2021, revisiting tabular DL]. We therefore hold the entire pipeline fixed across models and vary only the predictor.
+A recurring lesson of tabular benchmarking is that conclusions are protocol-sensitive---tuning budgets, preprocessing, and split design can reverse rankings \cite{grinsztajn2022,gorishniy2021}. We therefore hold the entire pipeline fixed across models and vary only the predictor.
 
 \paragraph{Novelty.}
 The intersection of these strands is empty: existing TabPFN evaluations do not audit calibration or conformal behaviour against matched baselines; the conformal-fairness literature has not examined foundation-model conformity scores; and tabular benchmarks do not report group-conditional coverage. We fill precisely this gap, in the regime where TabPFN is intended to operate (binary/multiclass tasks of moderate size with demographic structure), and we report the failure modes (APS degeneracy, Mondrian small-group noise) alongside the successes.
@@ -100,10 +101,10 @@ A classifier is \emph{top-label calibrated} if $\Pr\!\big(Y = \hat y \,\big|\, \
 \mathrm{ECE} \;=\; \sum_{b=1}^{B} \frac{|\mathcal{B}_b|}{n} \,\Big|\, \mathrm{acc}(\mathcal{B}_b) - \mathrm{conf}(\mathcal{B}_b) \,\Big| ,
 \label{eq:ece}
 \end{equation}
-where $\mathrm{acc}$ and $\mathrm{conf}$ are the mean accuracy and mean confidence within a bin. We use \emph{adaptive} (equal-mass) binning with $B = 15$ bins as the primary estimator and report equal-width ECE in the released CSVs; we additionally report the maximum calibration error (MCE), the Brier score $\frac1n\sum_i \|\hat p(\cdot\mid x_i) - e_{y_i}\|_2^2$, and the negative log-likelihood (NLL), both strictly proper scoring rules. \emph{Temperature scaling} [CIT: Guo et al.\ 2017] post-processes logits $z$ as $\mathrm{softmax}(z/T)$ with a single scalar $T>0$ fit on the calibration split by NLL minimization; it is monotone and therefore accuracy-preserving.
+where $\mathrm{acc}$ and $\mathrm{conf}$ are the mean accuracy and mean confidence within a bin. We use \emph{adaptive} (equal-mass) binning with $B = 15$ bins as the primary estimator and report equal-width ECE in the released CSVs; we additionally report the maximum calibration error (MCE), the Brier score $\frac1n\sum_i \|\hat p(\cdot\mid x_i) - e_{y_i}\|_2^2$, and the negative log-likelihood (NLL), both strictly proper scoring rules. \emph{Temperature scaling} \cite{guo2017}post-processes logits $z$ as $\mathrm{softmax}(z/T)$ with a single scalar $T>0$ fit on the calibration split by NLL minimization; it is monotone and therefore accuracy-preserving.
 
 \subsection{Split conformal prediction}
-Split conformal prediction [CIT: Papadopoulos et al.\ 2002] [CIT: Vovk et al.\ 2005] uses a held-out calibration set $\{(x_i, y_i)\}_{i=1}^{n}$, disjoint from training data, and a conformity score $s(x,y)$ measuring how poorly $y$ conforms at $x$ (larger $=$ worse). Let
+Split conformal prediction \cite{papadopoulos2002,vovk2005}uses a held-out calibration set $\{(x_i, y_i)\}_{i=1}^{n}$, disjoint from training data, and a conformity score $s(x,y)$ measuring how poorly $y$ conforms at $x$ (larger $=$ worse). Let
 \begin{equation}
 \hat q \;=\; \text{the } \frac{\lceil (n+1)(1-\alpha) \rceil}{n}\text{-th empirical quantile of } \{s(x_i,y_i)\}_{i=1}^{n}.
 \label{eq:quantile}
@@ -113,16 +114,16 @@ The prediction set for a test point $x$ is $C(x) = \{\, y : s(x,y) \le \hat q \,
 1-\alpha \;\le\; \Pr\big(Y_{\mathrm{test}} \in C(X_{\mathrm{test}})\big) \;\le\; 1-\alpha + \frac{1}{n+1},
 \label{eq:coverage}
 \end{equation}
-where the upper bound holds when scores are almost surely distinct [CIT: Lei et al.\ 2018, distribution-free predictive inference] [CIT: Angelopoulos \& Bates 2023]. Coverage is \emph{marginal}: it averages over the population and need not hold conditionally on subgroups.
+where the upper bound holds when scores are almost surely distinct \cite{lei2018,angelopoulos2023}. Coverage is \emph{marginal}: it averages over the population and need not hold conditionally on subgroups.
 
 \subsection{Conformity scores: LAC and APS}
 We evaluate two standard classification scores.
-\emph{LAC} (least ambiguous set-valued classifier) [CIT: Sadinle et al.\ 2019] sets
+\emph{LAC} (least ambiguous set-valued classifier) \cite{sadinle2019}sets
 \begin{equation}
 s_{\mathrm{LAC}}(x,y) \;=\; 1 - \hat p(y \mid x),
 \end{equation}
 which yields the smallest average set size among procedures with marginal validity when probabilities are correct, but offers no conditional-coverage adaptivity.
-\emph{APS} (adaptive prediction sets) [CIT: Romano et al.\ 2020] sorts classes by predicted probability, $\hat p_{(1)} \ge \dots \ge \hat p_{(K)}$, and scores
+\emph{APS} (adaptive prediction sets) \cite{romano2020aps}sorts classes by predicted probability, $\hat p_{(1)} \ge \dots \ge \hat p_{(K)}$, and scores
 \begin{equation}
 s_{\mathrm{APS}}(x,y) \;=\; \sum_{j : \hat p_{(j)} > \hat p(y\mid x)} \hat p_{(j)} \;+\; u \cdot \hat p(y \mid x),
 \qquad u \sim \mathrm{Unif}(0,1),
@@ -130,12 +131,17 @@ s_{\mathrm{APS}}(x,y) \;=\; \sum_{j : \hat p_{(j)} > \hat p(y\mid x)} \hat p_{(j
 where the randomization term $u$ is essential for exact validity; the deterministic variant ($u \equiv 1$, i.e., including the full mass of the label's own class) is conservative. Our implementation uses the deterministic variant (the score accumulates sorted class probabilities up to and including the true label's own mass, with no tie-breaking randomization), and Section~\ref{sec:rq2} shows this is not a cosmetic detail on binary tasks.
 
 \subsection{Mondrian (group-conditional) conformal prediction and equalized coverage}
-Given a partition of the population by a taxonomy $g(x,a) \in \mathcal{G}$ (here: the protected attribute, or the predicted class), Mondrian conformal prediction [CIT: Vovk 2003] computes the quantile in Eq.~\eqref{eq:quantile} \emph{separately within each group}, using the $n_g$ calibration points of group $g$. This yields the group-conditional guarantee
+Given a partition of the population by a taxonomy $g(x,a) \in \mathcal{G}$ (here: the protected attribute, or the predicted class), Mondrian conformal prediction \cite{vovk2003}computes the quantile in Eq.~\eqref{eq:quantile} \emph{separately within each group}, using the $n_g$ calibration points of group $g$. This yields the group-conditional guarantee
 \begin{equation}
 \Pr\big(Y \in C(X) \,\big|\, g(X,A) = g\big) \;\ge\; 1-\alpha \qquad \text{for every } g \in \mathcal{G},
 \label{eq:mondrian}
 \end{equation}
-i.e., \emph{equalized coverage} in expectation [CIT: Romano et al.\ 2020, equalized coverage]. The price is statistical: each group's threshold is estimated from $n_g \ll n$ points, inflating the variance of empirical per-group coverage by roughly the usual $O(1/\sqrt{n_g})$ factor, and the guarantee's finite-sample slack $1/(n_g+1)$ grows as groups shrink. Our RQ3 results quantify exactly this trade-off.
+i.e., \emph{equalized coverage} in expectation \cite{romano2020eq}. The price is statistical, and it is the crux of our RQ3. Each group's threshold $\hat q_g$ is estimated from only $n_g \ll n$ calibration points; and because the realized per-group coverage on the test set is an average of (approximately) $\mathrm{Bernoulli}(1-\alpha)$ indicators, its standard deviation about the nominal level is
+\begin{equation}
+\mathrm{sd}\big(\hat c_g\big) \;\approx\; \sqrt{\tfrac{\alpha(1-\alpha)}{n_g}} .
+\label{eq:gvar}
+\end{equation}
+The empirical max$-$min coverage gap over $|\mathcal{G}|$ groups is therefore dominated by the smallest stratum, growing like $1/\sqrt{\min_g n_g}$, and the guarantee's finite-sample slack $1/(n_g+1)$ likewise grows as groups shrink. Equalized coverage \emph{in expectation} (Eq.~\eqref{eq:mondrian}) is thus fully compatible with a \emph{larger realized} gap than marginal calibration produces whenever strata are small---the effect our RQ3 isolates and Eq.~\eqref{eq:gvar} quantifies.
 
 \subsection{Fairness metrics for prediction sets}
 For groups $g \in \mathcal{G}$ with empirical per-group coverage $c_g$ and mean set size $\bar k_g$ on the test set, we report the \emph{coverage gap} $\max_g c_g - \min_g c_g$, the \emph{worst-group coverage} $\min_g c_g$, and the \emph{set-size disparity} $\max_g \bar k_g - \min_g \bar k_g$.
@@ -145,7 +151,7 @@ For groups $g \in \mathcal{G}$ with empirical per-group coverage $c_g$ and mean 
 \label{sec:method}
 
 \subsection{Datasets and protected attributes}
-We use three binary prediction tasks from the folktables suite [CIT: Ding et al.\ 2021], all on California ACS microdata (2018 1-Year person-survey release): \textbf{ACSIncome} (predict income $>\$50$k), \textbf{ACSEmployment} (predict employment status), and \textbf{ACSPublicCoverage} (predict public health-insurance coverage). These tasks were introduced precisely as fairness-aware replacements for UCI Adult and carry the protected attributes we audit: \emph{sex} (2 groups, derived from the binary SEX field), \emph{race} (from RAC1P, coarsened to four groups---White, Black, Asian, and a merged \emph{Other} stratum collecting all remaining RAC1P codes), and \emph{age} (AGEP binned into five bands with edges at 25, 40, 55, and 65: $<$25, 25--39, 40--54, 55--64, 65+). ACSPublicCoverage is defined by folktables only for respondents under 65, so it carries four age bands rather than five. In addition to the three protected axes we evaluate a \emph{predicted-class} taxonomy (Mondrian on $\hat y$), a standard label-conditional stratification. Per-group calibration-set sizes are reported in Table~\ref{tab:groupsizes}; they are the key to the race-axis result in Section~\ref{sec:rq3}.
+We use three binary prediction tasks from the folktables suite \cite{ding2021}, all on California ACS microdata (2018 1-Year person-survey release): \textbf{ACSIncome} (predict income $>\$50$k), \textbf{ACSEmployment} (predict employment status), and \textbf{ACSPublicCoverage} (predict public health-insurance coverage). These tasks were introduced precisely as fairness-aware replacements for UCI Adult and carry the protected attributes we audit: \emph{sex} (2 groups, derived from the binary SEX field), \emph{race} (from RAC1P, coarsened to four groups---White, Black, Asian, and a merged \emph{Other} stratum collecting all remaining RAC1P codes), and \emph{age} (AGEP binned into five bands with edges at 25, 40, 55, and 65: $<$25, 25--39, 40--54, 55--64, 65+). ACSPublicCoverage is defined by folktables only for respondents under 65, so it carries four age bands rather than five. In addition to the three protected axes we evaluate a \emph{predicted-class} taxonomy (Mondrian on $\hat y$), a standard label-conditional stratification. Per-group calibration-set sizes are reported in Table~\ref{tab:groupsizes}; they are the key to the race-axis result in Section~\ref{sec:rq3}.
 
 \begin{table}[t]
 \centering
@@ -240,8 +246,8 @@ Three observations follow. \emph{First}, both GBDTs are substantially miscalibra
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.55\linewidth]{figures/reliability_example.png}
-\caption{Reliability diagram on ACSPublicCoverage-CA (seed 0). XGBoost (orange) sits below the diagonal at high confidence---systematic over-confidence---while TabPFN (blue) tracks the diagonal closely. Curves use equal-mass confidence bins; the dashed line is perfect calibration.}
+\includegraphics[width=0.55\linewidth]{reliability_example}
+\caption{Reliability diagram on ACSPublicCoverage-CA (seed 0). XGBoost (orange) sits below the diagonal at high confidence---systematic over-confidence---while TabPFN (blue) tracks the diagonal closely. Curves use 15 equal-width confidence bins; the dashed line is perfect calibration.}
 \label{fig:reliability}
 \end{figure}
 
@@ -272,7 +278,7 @@ TabPFN    & $0.809$ & $\mathbf{1.058}$ & $0.900$ & $\mathbf{1.296}$ & $0.950$ & 
 Efficiency, by contrast, is model-dependent and rewards probability quality. TabPFN produces the smallest prediction sets at every target level; at the $90\%$ level its mean set size of $1.296$ improves on LightGBM ($1.327$), XGBoost ($1.339$), and the MLP ($1.363$), with paired Wilcoxon $p = 4.3\times10^{-4}$, $3.1\times10^{-4}$, and $6.5\times10^{-4}$ respectively. On a binary task, set size minus one is the singleton-failure rate, so this difference is operationally meaningful: at the $90\%$ level TabPFN returns an uninformative two-label set on $29.6\%$ of cases versus $36.3\%$ for the MLP---a $6.7$-point reduction in abstentions at identical coverage.
 
 \paragraph{A cautionary negative result on APS.}
-Under our deterministic APS implementation, every model at every level returns essentially the full label set: pooled coverage is $1.000$ and mean set size is $1.99$--$2.00$ at all three targets. The mechanism is elementary but easy to overlook: on a binary task the deterministic APS score of the true label is the cumulative probability mass \emph{including} the label's own class, which equals $1$ whenever the true label is the lower-ranked class; the calibration quantile at any usable $\alpha$ therefore saturates at (or near) $1$, and the resulting sets contain both labels. Randomized APS [CIT: Romano et al.\ 2020] avoids this by interpolating the final class's mass. Practitioners wrapping binary tabular classifiers should either use LAC or ensure their APS implementation randomizes; we flag this because deterministic APS is the default in some libraries and the failure is silent---coverage looks excellent while the sets are vacuous. All fairness analyses below therefore use the LAC score; the corresponding APS rows are retained in the released CSVs but are uninformative by construction.
+Under our deterministic APS implementation, every model at every level returns essentially the full label set: pooled coverage is $1.000$ and mean set size is $1.99$--$2.00$ at all three targets. The mechanism is elementary but easy to overlook: on a binary task the deterministic APS score of the true label is the cumulative probability mass \emph{including} the label's own class, which equals $1$ whenever the true label is the lower-ranked class; the calibration quantile at any usable $\alpha$ therefore saturates at (or near) $1$, and the resulting sets contain both labels. Randomized APS \cite{romano2020aps}avoids this by interpolating the final class's mass. Practitioners wrapping binary tabular classifiers should either use LAC or ensure their APS implementation randomizes; we flag this because deterministic APS is the default in some libraries and the failure is silent---coverage looks excellent while the sets are vacuous. All fairness analyses below therefore use the LAC score; the corresponding APS rows are retained in the released CSVs but are uninformative by construction.
 
 \subsection{RQ3: Marginal coverage hides subgroup gaps; Mondrian repairs large groups but harms small ones}
 \label{sec:rq3}
@@ -332,22 +338,22 @@ On race, Mondrian \emph{increases} the empirical gap at the $90\%$ target from $
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/coverage_gap_age.png}
-\caption{Coverage gap by age at the $90\%$ target, marginal (blue) vs.\ Mondrian (orange), per model (LAC score). Mondrian reduces the gap by roughly $0.03$ uniformly across all five models, TabPFN included. [NOTE TO AUTHORS: regenerate this figure after filtering \texttt{conf.score == 'lac'}; the current PNG averages in the degenerate APS rows and halves all bar heights --- see cover note.]}
+\includegraphics[width=0.85\linewidth]{coverage_gap_age}
+\caption{Coverage gap by age at the $90\%$ target, marginal (blue) vs.\ Mondrian (orange), per model (LAC score). Mondrian reduces the gap by roughly $0.03$ uniformly across all five models, TabPFN included.}
 \label{fig:gapage}
 \end{figure}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/coverage_gap_sex.png}
-\caption{Coverage gap by sex at the $90\%$ target. Gaps are an order of magnitude smaller than on age and statistically indistinguishable between methods. [Same regeneration note as Fig.~\ref{fig:gapage}.]}
+\includegraphics[width=0.85\linewidth]{coverage_gap_sex}
+\caption{Coverage gap by sex at the $90\%$ target (LAC score). Gaps are an order of magnitude smaller than on age and statistically indistinguishable between methods.}
 \label{fig:gapsex}
 \end{figure}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.85\linewidth]{figures/coverage_gap_race.png}
-\caption{Coverage gap by race at the $90\%$ target. Mondrian (orange) \emph{exceeds} marginal (blue) for every model: with small calibration strata, group-conditional thresholds are noisy and realized disparities grow. [Same regeneration note as Fig.~\ref{fig:gapage}.]}
+\includegraphics[width=0.85\linewidth]{coverage_gap_race}
+\caption{Coverage gap by race at the $90\%$ target (LAC score). Mondrian (orange) \emph{exceeds} marginal (blue) for every model: with small calibration strata, group-conditional thresholds are noisy and realized disparities grow.}
 \label{fig:gaprace}
 \end{figure}
 
@@ -362,7 +368,7 @@ Within the studied regime---binary census tasks, moderate sample sizes, five see
 The third criterion---equitable uncertainty---is not a model property at all in our data. Coverage gaps under marginal calibration are nearly identical across the five predictors, and so is the effect of Mondrian stratification. The decision that matters is procedural: \emph{which taxonomy to condition on, given its calibration support}. Our results give an unusually clean empirical demonstration of both sides: conditioning on age (few, large groups, with a real coverage disparity to fix) halves the gap at the cost of $0.02$ extra labels per set; conditioning on race (many groups, some very small) backfires, inflating realized disparity without improving the worst group. We emphasize that this is not a contradiction of the equalized-coverage guarantee, which is an expectation over calibration randomness; it is the finite-sample variance of that guarantee made visible. Reporting only the expectation-level guarantee, as is common, would have concealed it.
 
 \paragraph{Deployment guidance.}
-For practitioners deploying small-to-medium tabular classifiers with demographic structure, our results support the following sequence. (1) If TabPFN's scale limits permit, prefer it: best accuracy, best proper scores, no recalibration step. (2) Wrap whatever model is chosen in split conformal prediction with the \emph{LAC} score; verify that any APS implementation randomizes before using it on low-cardinality label spaces. (3) Audit per-group coverage on a held-out set before choosing between marginal and Mondrian calibration: if a gap exists \emph{and} every group has adequate calibration support, use Mondrian on that axis. As a rule of thumb, a group needs enough points for its $1-\alpha$ quantile to be stable---on the order of $n_g \gtrsim 10/\alpha$ (about $100$ at $\alpha=0.1$). Our axes straddle this line precisely: the smallest age band (65+, $n_g=140$ in ACSIncome; Table~\ref{tab:groupsizes}) clears it and Mondrian helps, whereas the smallest race stratum (Black, $n_g=84$ in ACSEmployment) falls below it and Mondrian backfires. if some groups are small, prefer marginal calibration, merge small strata, or adopt methods designed for approximate conditional validity [CIT: Gibbs et al.\ 2023] [CIT: Jung et al.\ 2023, batch multivalid prediction]. (4) Report worst-group coverage alongside marginal coverage; the latter alone certified all our models while one age group received $73\%$ coverage at an $80\%$ target.
+For practitioners deploying small-to-medium tabular classifiers with demographic structure, our results support the following sequence. (1) If TabPFN's scale limits permit, prefer it: best accuracy, best proper scores, no recalibration step. (2) Wrap whatever model is chosen in split conformal prediction with the \emph{LAC} score; verify that any APS implementation randomizes before using it on low-cardinality label spaces. (3) Audit per-group coverage on a held-out set before choosing between marginal and Mondrian calibration: if a gap exists \emph{and} every group has adequate calibration support, use Mondrian on that axis. As a rule of thumb, a group needs enough points for its $1-\alpha$ quantile to be stable---on the order of $n_g \gtrsim 10/\alpha$ (about $100$ at $\alpha=0.1$). Our axes straddle this line precisely: the smallest age band (65+, $n_g=140$ in ACSIncome; Table~\ref{tab:groupsizes}) clears it and Mondrian helps, whereas the smallest race stratum (Black, $n_g=84$ in ACSEmployment) falls below it and Mondrian backfires. If some groups are small, prefer marginal calibration, merge small strata, or adopt methods designed for approximate conditional validity \cite{gibbs2023,jung2023}. (4) Report worst-group coverage alongside marginal coverage; the latter alone certified all our models while one age group received $73\%$ coverage at an $80\%$ target.
 
 \paragraph{TabPFN versus GBDTs, honestly.}
 Our comparison favours TabPFN on every uncertainty metric, but three caveats temper a blanket recommendation. The tasks sit squarely inside TabPFN's comfort zone ($3{,}600$ training rows per cell, numeric/categorical census features, binary labels); the GBDTs received \emph{no} hyperparameter tuning---they ran with the fixed default settings of Section~\ref{sec:method}, and a tuning budget (e.g., NLL-based early stopping or a learning-rate/depth search) would likely close part of the calibration gap; and GBDT inference is orders of magnitude cheaper at scale. Where these constraints bind, the correct reading of our results is narrower but still useful: GBDT probabilities should not be consumed raw, and conformal wrapping equalizes validity (though not efficiency) across model families.
@@ -377,13 +383,13 @@ Our comparison favours TabPFN on every uncertainty metric, but three caveats tem
 \section{Conclusion and future work}
 \label{sec:conclusion}
 
-We presented the first matched-protocol audit of a tabular foundation model's predictive uncertainty spanning calibration, conformal validity and efficiency, and group-conditional coverage fairness. TabPFN's native probabilities proved as calibrated as a well-regularized MLP and far better than untuned GBDTs, required no temperature scaling, and yielded the smallest conformal prediction sets at every coverage level. At the same time, the fairness analysis showed that no model choice substitutes for procedural care: marginal conformal prediction concealed an eight-point age coverage gap common to all models, Mondrian calibration repaired it cheaply, and the same Mondrian procedure backfired on the small-support race axis---a concrete, statistically significant demonstration that equalized coverage in expectation can coexist with larger realized disparities. We also documented a silent failure of non-randomized APS on binary tasks.
+We showed that marginal conformal validity is not subgroup validity. Across five predictors and three census tasks, split conformal prediction met its marginal coverage guarantee while concealing an eight-point age coverage gap common to all models; group-conditional (Mondrian) calibration repaired this where strata were large but \emph{backfired} on the small-support race axis---a concrete, statistically significant demonstration that equalized coverage in expectation can coexist with larger realized disparities. These effects were governed by the conformal procedure and the group structure rather than the model, and a simple finite-sample variance argument ($\sqrt{\alpha(1-\alpha)/n_g}$) predicts which regime obtains. We also documented a silent failure of non-randomized APS on binary tasks. As the timely model under audit, TabPFN proved the most reliable base learner we tested: its native probabilities were as calibrated as a well-regularized MLP and far better than untuned GBDTs, required no temperature scaling, and yielded the smallest conformal prediction sets at every coverage level. Together these results give the first matched-protocol picture of a tabular foundation model's uncertainty \emph{and} a clean characterization of when group-conditional conformal calibration should be trusted.
 
-Future work proceeds on three fronts: (i) the Tier-B OpenML extension with Friedman--Nemenyi ranking to test generality across heterogeneous tabular domains; (ii) distribution-shift stress tests (cross-state and temporal transfer within ACS) probing coverage degradation when exchangeability fails, together with adaptive remedies [CIT: Gibbs \& Cand\`es 2021, adaptive conformal inference] [CIT: Tibshirani et al.\ 2019, covariate shift]; and (iii) a clinical-tabular extension, where TabPFN's small-data strengths and the cost asymmetry of miscoverage make equitable uncertainty both harder and more consequential, and where small protected strata will make the Mondrian failure mode we identified the central methodological obstacle.
+Future work proceeds on three fronts: (i) the Tier-B OpenML extension with Friedman--Nemenyi ranking to test generality across heterogeneous tabular domains; (ii) distribution-shift stress tests (cross-state and temporal transfer within ACS) probing coverage degradation when exchangeability fails, together with adaptive remedies \cite{gibbs2021,tibshirani2019}; and (iii) a clinical-tabular extension, where TabPFN's small-data strengths and the cost asymmetry of miscoverage make equitable uncertainty both harder and more consequential, and where small protected strata will make the Mondrian failure mode we identified the central methodological obstacle.
 
 % =====================================================================
 \section*{Reproducibility statement}
-All code, notebooks (smoke test, experiment runner, analysis), and the complete per-seed result files (\texttt{calibration.csv}, 75 rows; \texttt{conformal\_fairness.csv}, 3{,}600 rows) are released at [STILL MISSING: repository URL] under [STILL MISSING: license], with the following pinned dependency versions: \texttt{tabpfn} 8.0.7 (PyTorch 2.9.1 backend, classifier checkpoint \texttt{tabpfn-v3-classifier-v3\_default.ckpt}), \texttt{xgboost} 3.2.0, \texttt{lightgbm} 4.6.0, \texttt{scikit-learn} 1.8.0, \texttt{folktables} 0.0.12, \texttt{numpy} 2.3.5, and \texttt{scipy} 1.17.0 under Python 3.11+. Every table and statistic in this paper is regenerable from the committed CSVs by the analysis scripts; figures regenerate from the same files. Data are downloaded automatically from the US Census Bureau via folktables; no manual data placement is required. All experiments run on a single Apple Silicon MacBook with no GPU (CPU/MPS backend); [STILL MISSING: total wall-clock compute time for the full matrix---not logged during the run].
+All code, notebooks (smoke test, experiment runner, analysis), and the complete per-seed result files (\texttt{calibration.csv}, 75 rows; \texttt{conformal\_fairness.csv}, 3{,}600 rows) are released at \url{https://github.com/Nadim-Mahmud-23/tabpfn-uncertainty-audit} under the MIT license, with the following pinned dependency versions: \texttt{tabpfn} 8.0.7 (PyTorch 2.9.1 backend, classifier checkpoint \texttt{tabpfn-v3-classifier-v3\_default.ckpt}), \texttt{xgboost} 3.2.0, \texttt{lightgbm} 4.6.0, \texttt{scikit-learn} 1.8.0, \texttt{folktables} 0.0.12, \texttt{numpy} 2.3.5, and \texttt{scipy} 1.17.0 under Python 3.11+. Every table and statistic in this paper is regenerable from the committed CSVs by the analysis scripts; figures regenerate from the same files. Data are downloaded automatically from the US Census Bureau via folktables; no manual data placement is required. All experiments run on a single Apple Silicon MacBook with no GPU (CPU/MPS backend); the full experiment matrix completes in approximately one hour of wall-clock time (about $55$ minutes for the 75-cell run, dominated by TabPFN's CPU inference), well within the reach of commodity hardware.
 
 \section*{Declaration of competing interest}
 The author declares that he has no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
@@ -392,34 +398,10 @@ The author declares that he has no known competing financial interests or person
 \textbf{Nadim Mahmud Dipu:} Conceptualization, Methodology, Software, Validation, Formal analysis, Investigation, Data curation, Writing -- original draft, Writing -- review \& editing, Visualization.
 
 \section*{Data availability}
-The data used in this study are publicly available from the U.S.\ Census Bureau American Community Survey (ACS) Public Use Microdata Sample (PUMS), 2018 1-Year release, accessed programmatically via the folktables package [CIT: Ding et al.\ 2021]. All source code, notebooks, and the committed per-seed result files needed to reproduce every table and figure are released in the repository cited in the Reproducibility statement.
+The data used in this study are publicly available from the U.S.\ Census Bureau American Community Survey (ACS) Public Use Microdata Sample (PUMS), 2018 1-Year release, accessed programmatically via the folktables package \cite{ding2021}. All source code, notebooks, and the committed per-seed result files needed to reproduce every table and figure are released in the repository cited in the Reproducibility statement.
 
 % =====================================================================
 \bibliographystyle{elsarticle-num}
-\begin{thebibliography}{00}
-\bibitem{tabpfn2023} [CIT: Hollmann, M\"uller, Eggensperger, Hutter. TabPFN: A transformer that solves small tabular classification problems in a second. ICLR 2023.]
-\bibitem{tabpfn2025} [CIT: Hollmann et al. Accurate predictions on small data with a tabular foundation model. Nature, 2025.]
-\bibitem{pfn2022} [CIT: M\"uller et al. Transformers can do Bayesian inference. ICLR 2022.]
-\bibitem{grinsztajn2022} [CIT: Grinsztajn, Oyallon, Varoquaux. Why do tree-based models still outperform deep learning on tabular data? NeurIPS D\&B 2022.]
-\bibitem{mcelfresh2023} [CIT: McElfresh et al. When do neural nets outperform boosted trees on tabular data? NeurIPS D\&B 2023.]
-\bibitem{gorishniy2021} [CIT: Gorishniy et al. Revisiting deep learning models for tabular data. NeurIPS 2021.]
-\bibitem{guo2017} [CIT: Guo, Pleiss, Sun, Weinberger. On calibration of modern neural networks. ICML 2017.]
-\bibitem{niculescu2005} [CIT: Niculescu-Mizil \& Caruana. Predicting good probabilities with supervised learning. ICML 2005.]
-\bibitem{nixon2019} [CIT: Nixon et al. Measuring calibration in deep learning. CVPR Workshops 2019.]
-\bibitem{vovk2005} [CIT: Vovk, Gammerman, Shafer. Algorithmic Learning in a Random World. Springer 2005.]
-\bibitem{papadopoulos2002} [CIT: Papadopoulos et al. Inductive confidence machines for regression. ECML 2002.]
-\bibitem{angelopoulos2023} [CIT: Angelopoulos \& Bates. Conformal prediction: a gentle introduction. Foundations and Trends in ML, 2023.]
-\bibitem{sadinle2019} [CIT: Sadinle, Lei, Wasserman. Least ambiguous set-valued classifiers with bounded error levels. JASA 2019.]
-\bibitem{romano2020aps} [CIT: Romano, Sesia, Cand\`es. Classification with valid and adaptive coverage. NeurIPS 2020.]
-\bibitem{romano2020eq} [CIT: Romano, Barber, Sabatti, Cand\`es. With malice toward none: assessing uncertainty via equalized coverage. Harvard Data Science Review, 2020.]
-\bibitem{vovk2003} [CIT: Vovk et al. Mondrian confidence machine. Tech report / 2003.]
-\bibitem{lei2018} [CIT: Lei, G'Sell, Rinaldo, Tibshirani, Wasserman. Distribution-free predictive inference for regression. JASA 2018.]
-\bibitem{gibbs2023} [CIT: Gibbs, Cherian, Cand\`es. Conformal prediction with conditional guarantees. 2023.]
-\bibitem{jung2023} [CIT: Jung et al. Batch multivalid conformal prediction. ICLR 2023.]
-\bibitem{gibbs2021} [CIT: Gibbs \& Cand\`es. Adaptive conformal inference under distribution shift. NeurIPS 2021.]
-\bibitem{tibshirani2019} [CIT: Tibshirani, Barber, Cand\`es, Ramdas. Conformal prediction under covariate shift. NeurIPS 2019.]
-\bibitem{ding2021} [CIT: Ding, Hardt, Miller, Schmidt. Retiring Adult: new datasets for fair machine learning. NeurIPS 2021.]
-\bibitem{ding2023} [CIT: Ding et al. Class-conditional conformal prediction with many classes. NeurIPS 2023.]
-\end{thebibliography}
+\bibliography{refs}
 
 \end{document}
