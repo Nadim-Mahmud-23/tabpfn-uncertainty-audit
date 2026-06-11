@@ -24,3 +24,7 @@ paper/*.fdb_latexmk
 
 # JetBrains IDE
 .idea/
+
+# Local Overleaf bundle (generated convenience copy; the canonical sources live in paper/)
+submission/
+overleaf-submission.zip

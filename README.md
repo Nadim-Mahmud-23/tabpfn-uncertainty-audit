@@ -13,6 +13,28 @@ Conformal prediction is implemented from scratch in NumPy (`src/conformal.py`), 
 
 ---
 
+## Paper
+
+The manuscript (submitted to the *International Journal of Approximate Reasoning*) lives in
+[`paper/`](paper/):
+
+- `paper/paper.tex` — Elsevier `elsarticle` source; `paper/refs.bib` — verified references;
+  `paper/highlights.tex` — submission highlights; `paper/paper.pdf` — compiled (43 pp).
+- Build it with [Tectonic](https://tectonic-typesetting.github.io) — `cd paper && tectonic -X compile paper.tex`
+  — or with `pdflatex paper.tex; bibtex paper; pdflatex paper.tex; pdflatex paper.tex`.
+  For Overleaf, upload `paper.tex`, `refs.bib`, `highlights.tex`, and the `figures/` PDFs.
+
+**Every number in the paper is reproducible from the committed result CSVs:**
+
+- `python scripts/export_group_sizes.py` → `results/group_sizes.csv` (per-group calibration sizes).
+- `python scripts/verify_paper_numbers.py` → recomputes every table/prose statistic from
+  `results/*.csv` and prints PASS/FAIL (197/197 pass; all conformal/fairness numbers are LAC-only).
+- `python scripts/make_figures.py` → regenerates the figures (LAC-only, 300 dpi + vector PDF).
+
+`paper/CHANGES.md` is the full preparation log (every value's source, with `file:line` evidence).
+
+---
+
 ## 1. Setup (5 minutes)
 
 ```bash
