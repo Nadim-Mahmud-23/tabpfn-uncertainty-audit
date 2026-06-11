@@ -1,0 +1,26 @@
+# Large auto-downloaded data cache (Census ACS via folktables, OpenML) — not committed.
+# Everything here is regenerated automatically on first run.
+data/**
+!data/.gitkeep
+
+# Secrets — never commit real tokens (see .env.example).
+.env
+
+# Python / Jupyter / OS cruft
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+
+# LaTeX build intermediates (the compiled PDF is committed; these are not)
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.bbl
+paper/*.blg
+paper/*.synctex.gz
+paper/*.fls
+paper/*.fdb_latexmk
+
+# JetBrains IDE
+.idea/

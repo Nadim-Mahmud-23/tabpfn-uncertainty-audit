@@ -1,0 +1,16 @@
+model,target_coverage,marginal_coverage,mean_set_size
+lightgbm,0.8,0.901,1.534
+lightgbm,0.9,0.95,1.664
+lightgbm,0.95,0.976,1.759
+mlp,0.8,0.901,1.547
+mlp,0.9,0.951,1.681
+mlp,0.95,0.975,1.771
+tabpfn,0.8,0.905,1.524
+tabpfn,0.9,0.95,1.648
+tabpfn,0.95,0.975,1.74
+tabpfn_temp,0.8,0.905,1.524
+tabpfn_temp,0.9,0.95,1.648
+tabpfn_temp,0.95,0.975,1.74
+xgboost,0.8,0.9,1.541
+xgboost,0.9,0.95,1.67
+xgboost,0.95,0.976,1.767

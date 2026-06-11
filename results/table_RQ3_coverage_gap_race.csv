@@ -1,0 +1,6 @@
+model,marginal,mondrian
+lightgbm,0.0195,0.0322
+mlp,0.0238,0.0281
+tabpfn,0.0248,0.0276
+tabpfn_temp,0.0247,0.0276
+xgboost,0.0208,0.026
