@@ -28,3 +28,19 @@ paper/*.fdb_latexmk
 # Local Overleaf bundle (generated convenience copy; the canonical sources live in paper/)
 submission/
 overleaf-submission.zip
+
+# v2 revision working artifacts (regenerable; not committed)
+cache/
+overleaf_final_staging/
+overleaf-submission-final.zip
+paper_final.pdf
+paper_final/scripts/
+paper_final/paper.pdf
+paper_final/*.aux
+paper_final/*.log
+paper_final/*.out
+paper_final/*.bbl
+paper_final/*.blg
+# provided revision inputs (kept locally, not committed)
+paper_revised_preview.pdf
+overleaf-submission-revised/

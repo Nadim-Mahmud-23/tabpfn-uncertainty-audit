@@ -27,9 +27,17 @@ The manuscript (submitted to the *International Journal of Approximate Reasoning
 **Every number in the paper is reproducible from the committed result CSVs:**
 
 - `python scripts/export_group_sizes.py` → `results/group_sizes.csv` (per-group calibration sizes).
-- `python scripts/verify_paper_numbers.py` → recomputes every table/prose statistic from
-  `results/*.csv` and prints PASS/FAIL (197/197 pass; all conformal/fairness numbers are LAC-only).
-- `python scripts/make_figures.py` → regenerates the figures (LAC-only, 300 dpi + vector PDF).
+- `python scripts/verify_paper_numbers.py` → recomputes every final-manuscript table/prose
+  statistic from `results/*.csv` and the prediction cache, prints PASS/FAIL (72/72 pass).
+  Conformal/fairness numbers are **LAC-only** and pooled over the **four base models**
+  (tabpfn, xgboost, lightgbm, mlp); RQ3 contrasts are paired at the model-averaged
+  (dataset × seed) level, n=15, Holm-adjusted.
+- `python scripts/repaired_stats.py` → re-paired RQ3 Wilcoxon p-values (n=15, the corrected unit).
+- `python scripts/mc_noise_floor.py` → exact Beta–binomial null model (Section 4; no data needed).
+- `python scripts/build_cache.py` → caches per-cell probabilities (re-runs the matrix once),
+  then `python scripts/derive_from_cache.py` → per-group coverage, empty-set rates, randomized
+  APS, and temperature-scaled-GBDT metrics.
+- `python scripts/make_figures.py` (or `make_figures_final.py` for the revised, error-bar figures).
 
 `paper/CHANGES.md` is the full preparation log (every value's source, with `file:line` evidence).
 
@@ -76,8 +84,10 @@ credentialing. Add it later by writing one more loader that returns the same dic
 
 2. **`notebooks/02_run_experiments.ipynb`** — Run All.
    - Starts in **`QUICK=True`** mode (Tier A, 2 models, 2 seeds) so you see results in minutes.
-   - When happy, set **`QUICK=False`** for the full paper run (all datasets, 5 models, 10 seeds,
-     3 confidence levels, 2 conformity scores). This is an **overnight** job on a laptop.
+   - When happy, set **`QUICK=False`** for the full paper run: 3 ACS datasets, 5 model
+     configurations (TabPFN, TabPFN+T, XGBoost, LightGBM, MLP; +T GBDT variants for RQ1),
+     **5 seeds**, 3 confidence levels, and the LAC / deterministic-APS / randomized-APS scores.
+     This is about **one hour** of wall-clock time on a laptop, dominated by TabPFN CPU inference.
    - Writes `results/calibration.csv` and `results/conformal_fairness.csv` (checkpointed after
      every dataset, so it is safe to interrupt and resume).
 

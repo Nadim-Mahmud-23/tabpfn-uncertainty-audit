@@ -76,6 +76,37 @@ def aps_sets(test_probs: np.ndarray, qhat: float) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------- #
+# Randomized APS (Romano, Sesia, Candes 2020; paper Eq. 5)
+# --------------------------------------------------------------------------- #
+# The deterministic variant above (u == 1) is degenerate on binary tasks. The
+# randomized score draws u ~ Uniform(0,1) i.i.d. per example, for BOTH the
+# calibration scores and the test-set construction, which restores exact
+# validity. A single u per example is shared across that example's candidate
+# classes (one uniform per test point), following Romano et al.
+def aps_scores_rand(probs: np.ndarray, labels: np.ndarray, rng) -> np.ndarray:
+    n = len(labels)
+    order = np.argsort(-probs, axis=1)
+    sorted_p = np.take_along_axis(probs, order, axis=1)
+    prefix = np.cumsum(sorted_p, axis=1) - sorted_p     # mass strictly above
+    ranks = (order == labels[:, None]).argmax(axis=1)
+    py = probs[np.arange(n), labels]
+    prefix_y = prefix[np.arange(n), ranks]
+    u = rng.uniform(size=n)
+    return prefix_y + u * py
+
+
+def aps_sets_rand(test_probs: np.ndarray, qhat: float, rng) -> np.ndarray:
+    order = np.argsort(-test_probs, axis=1)
+    sorted_p = np.take_along_axis(test_probs, order, axis=1)
+    prefix = np.cumsum(sorted_p, axis=1) - sorted_p
+    u = rng.uniform(size=(test_probs.shape[0], 1))       # one u per example
+    include_sorted = (prefix + u * sorted_p) <= qhat
+    sets = np.zeros_like(test_probs, dtype=bool)
+    np.put_along_axis(sets, order, include_sorted, axis=1)
+    return sets
+
+
+# --------------------------------------------------------------------------- #
 # Unified marginal + Mondrian interface
 # --------------------------------------------------------------------------- #
 _SCORE_FNS = {"lac": (lac_scores, lac_sets), "aps": (aps_scores, aps_sets)}
