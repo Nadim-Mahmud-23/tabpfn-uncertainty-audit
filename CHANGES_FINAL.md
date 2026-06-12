@@ -72,11 +72,15 @@ Switching pooling from 5 models (incl. tabpfn_temp) to the 4 base models shifts 
   0 errors, 59 pp**. Package `overleaf-submission-final.zip` = paper.tex, refs.bib,
   highlights.tex, figures/ (5 referenced PDFs) — nothing else; compiled `paper_final.pdf` saved.
 
+## Calibration-size sweep (M3b) — DONE (scripts/calib_sweep.py)
+- Subsample each model's calibration set to n_cal in {500,1000,1500,2000}; recompute LAC
+  race/age marginal & Mondrian gaps vs min_g n_g, with the exact Mondrian null overlaid.
+  Result (Fig. gap_vs_support): race Mondrian rises 0.057 (min_n 97) -> 0.080 (min_n 23),
+  above marginal at every support level; age Mondrian repair weakens 0.051 (258) -> 0.072 (66).
+  Observed Mondrian gaps track their nulls. Added Fig. + paragraph to Sec 6.4. (Used n_cal up to
+  2000, the committed calibration size; n_cal=4000 would need a larger split, not pursued.)
+
 ## Items NOT done (with reason)
-- **Calibration-size sweep figure (M3b, gap_vs_support.pdf):** NOT added. It is "strongly
-  recommended" but optional; the cache supports it, but it needs a sweep over calibration
-  fractions (incl. n_cal=4000 > current 2000) and an mc_noise_floor extension. Deferred; the
-  null-model section stands without it. **Recommend adding before submission.**
 - **Second-state (TX) replication (M9 i):** deferred to future work (stated in Limitations) —
   needs a fresh data download + cache build.
 - **Zenodo DOI:** author's manual deposit step (left as a plain bracketed note in Reproducibility).
