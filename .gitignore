@@ -44,3 +44,4 @@ paper_final/*.blg
 # provided revision inputs (kept locally, not committed)
 paper_revised_preview.pdf
 overleaf-submission-revised/
+zenodo_deposit.zip
