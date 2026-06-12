@@ -1,0 +1,7 @@
+Highlights
+
+- Marginal conformal coverage hides subgroup miscoverage on US Census tasks
+- Mondrian calibration repairs large strata but can worsen small ones (race axis)
+- Exact Beta-binomial null separates structural bias from sampling noise
+- Null is computable pre-deployment from alpha, group sizes, and group count
+- TabPFN audit: best-calibrated base learner, smallest sets, no recalibration
